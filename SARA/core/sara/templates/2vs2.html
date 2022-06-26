@@ -1,0 +1,382 @@
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <!-- CSS only -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-0evHe/X+R7YkIZDRvuzKMRqM+OrBnVFBL6DOitfPri4tjfHxaWutUpFmBp4vmVor"
+      crossorigin="anonymous"
+    />
+
+    <script
+      src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"
+      type="text/javascript"
+    ></script>
+    <script
+      type="text/javascript"
+      src="//cdnjs.cloudflare.com/ajax/libs/socket.io/3.0.3/socket.io.min.js"
+    ></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/socket.io-stream/0.9.1/socket.io-stream.min.js"
+      integrity="sha512-LTN7WQKvmCiOWbwxE4XRu3NCRqLzkFo28vBDHVhAyKjhmorNGjtvFxQgbvAttO31Ij6An4AIXU4GVaYOC0eNpQ=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+    <script src="https://www.WebRTC-Experiment.com/RecordRTC.js"></script>
+  </head>
+
+  <body>
+    <form action="record" method="post" id="form1">
+      {%csrf_token%}
+      <div id="question"></div>
+      <input placeholder="ANSWER" type="number" id="answer" />
+      <input placeholder="REMAINDER" type="number" id="remainder" />
+      <input type="hidden" name="PERF" id="perf" />
+      <input value="CHECK ANSWER/REMAINDER" type="submit" id="submit" />
+    </form>
+    <button id="start-recording">start-recording</button>
+    <button id="stop-recording">Stop</button>
+    <div class="timer"></div>
+
+    <script>
+      let mode = "Train";
+      let correct = 0;
+      let count = 0;
+      let trials = 0;
+      let question;
+      let room_id = 1;
+      let audio = new Audio();
+      let answer;
+      let group = false;
+      let err;
+      let sid;
+      let res;
+      let remainder;
+      let timer_start;
+      let timer_end;
+      let served = false;
+      let scores = [];
+      let mediaRecorder;
+      let questions = [];
+      let recording = true;
+      let co_count = 0;
+      let socket = io.connect();
+
+      //1)
+      recording = true;
+      const stopRecording = document.getElementById("stop-recording");
+      const startRecording = document.getElementById("start-recording");
+      stopRecording.onclick = (e) => {
+        recording = false;
+        startRecording.disabled = false;
+        stopRecording.disabled = true;
+      };
+      startRecording.onclick = (e) => {
+        recording = true;
+        startRecording.disabled = true;
+        stopRecording.disabled = false;
+      };
+
+      let recordAudio;
+
+      socket.on("audio", (msg) => {
+        let b = new Blob([msg.data]);
+        if (!(sid == msg.user)) {
+          if (msg.group == group) {
+            let url = window.URL.createObjectURL(b);
+            audio.src = url;
+            audio.load();
+            audio.play();
+          }
+        }
+      });
+
+      //3)
+      startRecording.onclick = function () {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          navigator.getUserMedia(
+            {
+              audio: true,
+            },
+            function (stream) {
+              recordAudio = RecordRTC(stream, {
+                type: "audio",
+
+                //6)
+                mimeType: "audio/webm",
+                sampleRate: 44100,
+                // used by StereoAudioRecorder
+                // the range 22050 to 96000.
+                // let us force 16khz recording:
+                desiredSampRate: 16000,
+
+                // MediaStreamRecorder, StereoAudioRecorder, WebAssemblyRecorder
+                // CanvasRecorder, GifRecorder, WhammyRecorder
+                recorderType: StereoAudioRecorder,
+                // Dialogflow / STT requires mono audio
+                numberOfAudioChannels: 1,
+
+                // 1)
+                timeSlice: 1000,
+
+                // 2)
+                // as soon as the stream is available
+                ondataavailable: function (blob) {
+                  // 3
+                  // making use of socket.io-stream for bi-directional
+                  // streaming, create a stream
+                  if (recording) {
+                    socket.emit("audio", {
+                      aud: blob,
+                      group: group,
+                      room: room_id,
+                    });
+                  }
+                },
+              });
+
+              recordAudio.startRecording();
+            },
+            function (error) {
+              console.error(JSON.stringify(error));
+            }
+          );
+        }
+      };
+
+      //5)
+      function eqn() {
+        res = questions[count];
+        console.log(res);
+        console.log(count);
+        console.log(questions);
+        question = res.question;
+        answer = res.answer;
+        remainder = res.remainder;
+
+        if (remainder == 0) {
+          document.getElementById("remainder").style.visibility = "hidden";
+        } else {
+          document.getElementById("remainder").style.visibility = "visible";
+        }
+        document.getElementById("question").innerHTML = question;
+        console.log(questions);
+        count++;
+        if (mode === "Train" && count - 1 == 3) {
+          serve();
+        }
+      }
+
+      function gt() {
+        $.ajax({
+          type: "get",
+          url: "operate",
+          success: function (res) {
+            console.log(res);
+            if (questions.includes(res)) {
+              gt();
+            } else {
+              socket.emit("my_room_event", {
+                room: room_id,
+                group: group,
+                data: res,
+              });
+            }
+          },
+          error: function (err) {
+            console.log(err);
+          },
+        });
+      }
+      function count_f() {
+        timer_end = new Date();
+        var t = timer_end - timer_start;
+        t = t / 1000;
+        document.querySelector(".timer").innerHTML =
+          parseInt(t / 60) + ":" + parseInt(t % 60);
+        requestAnimationFrame(count_f);
+      }
+
+      function correctMessage(e) {
+        document.getElementById("answer").value = 0;
+
+        document.getElementById("remainder").value = 0;
+        
+        alert(e);
+      }
+      function errorMessage(e) {
+        err = true;
+        document.getElementById("answer").value = 0;
+        document.getElementById("remainder").value = 0;
+        alert(e);
+      }
+      function serve() {
+        served = true;
+        alert(correct)
+        alert(count)
+        let perf = parseFloat(correct / count-1);
+        console.log(perf);
+        timer_end = new Date();
+        t = timer_end - timer_start;
+        t = t / 60000;
+        t = Math.abs(Math.tanh(120 / t));
+        console.log(perf);
+        console.log(t);
+        t = (t + perf) / 2;
+        perf = t;
+        console.log(perf);
+        console.log(t);
+        alert(perf);
+
+        document.getElementById("perf").value = perf;
+        f = new FormData(document.getElementById("form1"));
+        $.ajax({
+          type: "post",
+          url: "record",
+          contentType: false,
+          processData: false,
+          mimeType: "multipart/form-data",
+          data: f,
+          success: function (res) {
+            socket.emit("my_room_event", {
+              room: room_id,
+              group: group,
+              data: t,
+            });
+            alert("end of");
+          },
+          error: function (err) {
+            console.log("error" + err);
+          },
+        });
+      }
+      document.getElementById("form1").onsubmit = function validate(e) {
+        e.preventDefault();
+        err = false;
+        var answer_ = document.getElementById("answer").value;
+        answer_ = parseInt(answer_);
+        if (isNaN(answer_)) {
+          errorMessage("Invalid Answer");
+        }
+
+        if (!remainder == 0) {
+          var remainder_ = document.getElementById("remainder").value;
+        } else {
+          var remainder_ = 0;
+        }
+        remainder_ = parseInt(remainder_);
+        if (isNaN(remainder_)) {
+          errorMessage("Invalid Remainder");
+        }
+
+        var question_ = document.getElementById("question").value;
+        if (!(answer_ == answer)) {
+          errorMessage("Wrong Answer");
+        }
+        if (!(remainder_ == remainder)) {
+          errorMessage("Wrong Remainder");
+        }
+        if (!err) {
+          socket.emit("correct", {
+            data: [answer_, remainder_],
+            group: group,
+            room: room_id,
+          });
+        } else {
+          socket.emit("trials", {
+            data: [answer_, remainder_],
+            group: group,
+            room: room_id,
+          });
+        }
+      };
+
+      socket.on("connect", () => {
+        alert("conneccted"); // true
+
+        socket.emit("lobby", { condition: "{{cond}}" });
+      });
+      socket.on("sid", (msg) => {
+        sid = msg.data;
+        alert(sid);
+      });
+      socket.on("group", (msg) => {
+        group = msg.data;
+      });
+      socket.on("clear", () => {
+        scores = [];
+        count = 0;
+        trials = 0;
+        correct = 0;
+        console.log(questions);
+      });
+      socket.on("lobby", (msg) => {
+        room_id = msg.data;
+        alert(room_id);
+        socket.emit("join", { room: room_id });
+      });
+      socket.on("full", () => {
+        for (let i = 0; i < parseInt(parseInt("{{num}}") / 2); i++) {
+          gt();
+        }
+        console.log(questions);
+      });
+      socket.on("next", (msg) => {
+        msg.group == group ? eqn() : console.log();
+      });
+      socket.on("disconnect", () => {
+        alert("Disconnected");
+      });
+      socket.on("recoil", (msg) => {});
+      socket.on("done", (msg) => {
+        alert("done");
+        scores.push(msg.data);
+        scores.sort(function (a, b) {
+          return b - a;
+        });
+        alert(scores);
+        cancelAnimationFrame(count_f);
+      });
+      socket.on("correct", (msg) => {
+        if (group == msg.group) {
+          correct++;
+          alert("you got" + msg.data);
+          alert("tried Answer" + msg.data[0], "REmainder" + msg.data[1]);
+          correctMessage("YOUR ANSWER IS CORRECT");
+          eqn();
+        }
+      });
+      socket.on("trials", (msg) => {
+        if (group == msg.group) {
+          trials++;
+          alert("tried Answer" + msg.data[0], "REmainder" + msg.data[1]);
+          if (trials == 4) {
+            if (remainder == 0) errorMessage("Answer is" + answer);
+            else {
+              errorMessage("Answer is" + answer);
+              errorMessage("Remainder is" + remainder);
+            }
+            eqn();
+            trials = 0;
+          }
+        }
+      });
+      socket.on("que", (msg) => {
+        res = msg.data;
+
+        questions.push(res);
+        co_count++;
+        console.log(co_count);
+        if (co_count == parseInt("{{num}}")) {
+          timer_start = new Date();
+          count_f();
+          eqn();
+        }
+      });
+    </script>
+  </body>
+</html>
