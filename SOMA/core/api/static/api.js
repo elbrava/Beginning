@@ -34,7 +34,7 @@ if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
             numberOfAudioChannels: 1,
 
             // 1)
-            timeSlice: 1000,
+            timeSlice: ,
 
             // 2)
             // as soon as the stream is available

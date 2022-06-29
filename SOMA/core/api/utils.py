@@ -103,8 +103,8 @@ def speech(audio,json=None, extended=None,hot_words=None, candidate_transcripts=
                 fs_orig, desired_sample_rate
             ),
         )
-        audio,fs_new =librosa.load(audio,sr=desired_sample_rate,dtype=np.int16)
-        audio=audio.astype()
+        audio,fs_new =librosa.load(audio,sr=desired_sample_rate)
+        audio=audio.astype(np.int16)
     else:
         audio = np.frombuffer(fin.readframes(fin.getnframes()), np.int16)
 
@@ -129,4 +129,4 @@ def speech(audio,json=None, extended=None,hot_words=None, candidate_transcripts=
     )
 main(model=r"C:\Users\Admin\Downloads\model.tflite",scorer=r"C:\Users\Admin\Downloads\huge-vocabulary.scorer")
 
-speech(audio=r"C:\Users\Admin\Downloads\f2bjrop1.0.wav",hot_words="wanted chief justice of the massachusetts supreme court in april the escocs current leader edward hennessy reaches the mandatory retirement age of seventy and a successor is".s),
+speech(audio=r"C:\Users\Admin\Downloads\OSR_us_000_0010_8k.wav")
