@@ -3,30 +3,14 @@ import subprocess
 import wave
 from shlex import quote, shlex
 
+import librosa
 import numpy as np
 from stt import Model
 from timeit import default_timer as timer
 
-def convert_samplerate(audio_path, desired_sample_rate):
-    sox_cmd = "sox {} --type raw --bits 16 --channels 1 --rate {} --encoding signed-integer --endian little --compression 0.0 --no-dither - ".format(
-        quote(audio_path), desired_sample_rate
-    )
-    try:
-        output = subprocess.check_output(shlex.split(sox_cmd), stderr=subprocess.PIPE)
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError("SoX returned non-zero status: {}".format(e.stderr))
-    except OSError as e:
-        raise OSError(
-            e.errno,
-            "SoX not found, use {}hz files or install it: {}".format(
-                desired_sample_rate, e.strerror
-            ),
-        )
-
-    return desired_sample_rate, np.frombuffer(output, np.int16)
 
 desired_sample_rate = None
-ds = None
+ds =None
 
 
 def words_from_candidate_transcript(metadata):
@@ -78,7 +62,8 @@ def metadata_to_string(metadata):
     return "".join(token.text for token in metadata.tokens)
 
 
-def main(model, beam_width, scorer, lm_beta=None, lm_alpha=None ):
+def main(model,scorer, beam_width=None,  lm_beta=None, lm_alpha=None ):
+    global ds,desired_sample_rate
     model_load_start = timer()
     ds = Model(model)
     # sphinx-doc: python_ref_model_stop
@@ -101,10 +86,9 @@ def main(model, beam_width, scorer, lm_beta=None, lm_alpha=None ):
             ds.setScorerAlphaBeta(lm_alpha, lm_beta)
 
 
-main()
 
 
-def speech(hot_words, json, extended, audio, candidate_transcripts):
+def speech(audio,json=None, extended=None,hot_words=None, candidate_transcripts=1):
     if hot_words:
         print("Adding hot-words")
         for word_boost in hot_words.split(","):
@@ -119,7 +103,8 @@ def speech(hot_words, json, extended, audio, candidate_transcripts):
                 fs_orig, desired_sample_rate
             ),
         )
-        fs_new, audio = convert_samplerate(audio, desired_sample_rate)
+        audio,fs_new =librosa.load(audio,sr=desired_sample_rate)
+        audio=audio.astype(np.int16)
     else:
         audio = np.frombuffer(fin.readframes(fin.getnframes()), np.int16)
 
@@ -142,3 +127,6 @@ def speech(hot_words, json, extended, audio, candidate_transcripts):
     print(
         "Inference took %0.3fs for %0.3fs audio file." % (inference_end, audio_length),
     )
+main(model=r"C:\Users\Admin\Downloads\model.tflite",scorer=r"C:\Users\Admin\Downloads\huge-vocabulary.scorer")
+
+speech(audio=r"C:\Users\Admin\Downloads\f2bjrop1.0.wav")
