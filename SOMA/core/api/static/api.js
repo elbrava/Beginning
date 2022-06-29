@@ -1,6 +1,6 @@
 let control_element = document.querySelector(".control");
 let f;
-let socket=io("http://127.0.0.1:8000");
+let socket=io.connect();
 socket.on("connect", () => {
     alert("conneccted"); // true
 });
@@ -34,7 +34,7 @@ if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
             numberOfAudioChannels: 1,
 
             // 1)
-            timeSlice: ,
+            timeSlice: 4000,
 
             // 2)
             // as soon as the stream is available

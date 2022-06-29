@@ -5,12 +5,12 @@ from shlex import quote, shlex
 
 import librosa
 import numpy as np
+from pydub import AudioSegment
 from stt import Model
 from timeit import default_timer as timer
 
-
 desired_sample_rate = None
-ds =None
+ds = None
 
 
 def words_from_candidate_transcript(metadata):
@@ -62,8 +62,8 @@ def metadata_to_string(metadata):
     return "".join(token.text for token in metadata.tokens)
 
 
-def main(model,scorer, beam_width=None,  lm_beta=None, lm_alpha=None ):
-    global ds,desired_sample_rate
+def main(model, scorer, beam_width=None, lm_beta=None, lm_alpha=None):
+    global ds, desired_sample_rate
     model_load_start = timer()
     ds = Model(model)
     # sphinx-doc: python_ref_model_stop
@@ -86,47 +86,34 @@ def main(model,scorer, beam_width=None,  lm_beta=None, lm_alpha=None ):
             ds.setScorerAlphaBeta(lm_alpha, lm_beta)
 
 
-
-
-def speech(audio,json=None, extended=None,hot_words=None, candidate_transcripts=1):
+def speech(audio, json=None, extended=None, hot_words=None, candidate_transcripts=1):
     if hot_words:
         print("Adding hot-words")
         for word_boost in hot_words.split(","):
             word, boost = word_boost.split(":")
             ds.addHotWord(word, float(boost))
 
-    fin = wave.open(audio, "rb")
-    fs_orig = fin.getframerate()
-    if fs_orig != desired_sample_rate:
-        print(
-            "Warning: original sample rate ({}) is different than {}hz. Resampling might produce erratic speech recognition.".format(
-                fs_orig, desired_sample_rate
-            ),
-        )
-        audio,fs_new =librosa.load(audio,sr=desired_sample_rate)
-        audio=audio.astype(np.int16)
-    else:
-        audio = np.frombuffer(fin.readframes(fin.getnframes()), np.int16)
+    fin = audio
 
-    audio_length = fin.getnframes() * (1 / fs_orig)
-    fin.close()
+    audio = np.frombuffer(fin, np.int16)
+
 
     print("Running inference.")
     inference_start = timer()
     # sphinx-doc: python_ref_inference_start
     if extended:
-        print(metadata_to_string(ds.sttWithMetadata(audio, 1).transcripts[0]))
+        return metadata_to_string(ds.sttWithMetadata(audio, 1).transcripts[0])
     elif json:
-        print(
-            metadata_json_output(ds.sttWithMetadata(audio, candidate_transcripts))
-        )
+        return metadata_json_output(ds.sttWithMetadata(audio, candidate_transcripts))
+
     else:
-        print(ds.stt(audio))
+        return ds.stt(audio)
     # sphinx-doc: python_ref_inference_stop
-    inference_end = timer() - inference_start
+
+
+"""    inference_end = timer() - inference_start
     print(
         "Inference took %0.3fs for %0.3fs audio file." % (inference_end, audio_length),
-    )
-main(model=r"C:\Users\Admin\Downloads\model.tflite",scorer=r"C:\Users\Admin\Downloads\huge-vocabulary.scorer")
+    )"""
 
-speech(audio=r"C:\Users\Admin\Downloads\OSR_us_000_0010_8k.wav")
+main(model=r"C:\Users\Admin\Downloads\model.tflite", scorer=r"C:\Users\Admin\Downloads\huge-vocabulary.scorer")

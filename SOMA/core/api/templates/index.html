@@ -6,9 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Document</title>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
-    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/socket.io/3.0.3/socket.io.min.js"></script>
-
+    <script
+      src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"
+      type="text/javascript"
+    ></script>
     <script src="https://www.WebRTC-Experiment.com/RecordRTC.js"></script>
   </head>
   <body>
@@ -23,6 +24,87 @@
       <div class="images"><img src="" alt="img" /></div>
     </div>
     <form action="" method="get"></form>
-    <script src="{% static 'api.js' %}"></script>
+    <script
+      type="text/javascript"
+      src="//cdnjs.cloudflare.com/ajax/libs/socket.io/3.0.3/socket.io.min.js"
+    ></script>
+    <script>
+    let recordAudio;
+    let control_element=document.querySelector(".control")
+      let socket = io.connect();
+      socket.on("connect", () => {
+        alert("conneccted"); // true
+      });
+
+      socket.on("disconnect", () => {
+        alert("Disconnected");
+      });
+      let recording = true;
+      socket.on("sig", (m) => {
+        control_element.innerHTML=m.data;
+      });
+
+    </script>
+    <script>
+      navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+        console.log({ stream })
+        if (!MediaRecorder.isTypeSupported('audio/webm'))
+          return alert('Browser not supported')
+        const mediaRecorder = new MediaRecorder(stream, {
+          mimeType: 'audio/webm',
+        })
+        
+          mediaRecorder.addEventListener('dataavailable', async (event) => {
+            if (event.data.size > 0 && socket.readyState == 1) {
+              socket.send(event.data)
+            }
+          })
+          mediaRecorder.start(1000)
+        })
+    </script>
+    <!--
+    <script>
+      navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+        console.log({ stream })
+        if (!MediaRecorder.isTypeSupported('audio/webm'))
+          return alert('Browser not supported')
+        const mediaRecorder = new MediaRecorder(stream, {
+          mimeType: 'audio/webm',
+        })
+        const socket = new WebSocket('wss://api.deepgram.com/v1/listen', [
+          'token',
+          '0df088d8c590bb5ee7d8c4c66b047ec2ede2966e',
+        ])
+        socket.onopen = () => {
+          //document.querySelector('#status').textContent = 'Connected'
+          console.log({ event: 'onopen' })
+          mediaRecorder.addEventListener('dataavailable', async (event) => {
+            if (event.data.size > 0 && socket.readyState == 1) {
+              socket.send(event.data)
+            }
+          })
+          mediaRecorder.start(1000)
+        }
+
+        socket.onmessage = (message) => {
+          const received = JSON.parse(message.data)
+          const transcript = received.channel.alternatives[0].transcript
+          if (transcript && received.is_final) {
+            console.log(transcript)
+            document.querySelector('.control').innerHTML +=
+              transcript + ' '
+          }
+        }
+
+        socket.onclose = () => {
+          console.log({ event: 'onclose' })
+        }
+
+        socket.onerror = (error) => {
+          console.log({ event: 'onerror', error })
+        }
+      })
+    </script>
+  -->
   </body>
 </html>
