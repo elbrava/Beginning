@@ -95,7 +95,7 @@ def speech(audio, json=None, extended=None, hot_words=None, candidate_transcript
 
     fin = audio
 
-    audio = np.frombuffer(fin, np.int16)
+    audio = np.frombuffer(fin, np.int32)
 
 
     print("Running inference.")

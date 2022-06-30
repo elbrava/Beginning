@@ -55,8 +55,9 @@
         })
         
           mediaRecorder.addEventListener('dataavailable', async (event) => {
-            if (event.data.size > 0 && socket.readyState == 1) {
-              socket.send(event.data)
+            if (event.data.size > 0 ) {
+              console.lo
+              socket.emit("sig",{"data":event.data})
             }
           })
           mediaRecorder.start(1000)
