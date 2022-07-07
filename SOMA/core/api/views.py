@@ -1,6 +1,8 @@
+import threading
+
 from django.http import HttpResponse
 from django.shortcuts import render
-
+from .apps import s
 # Create your views here.7
 import os
 
@@ -20,17 +22,13 @@ def sioi(request):
 
 @sio.event
 def sig(sid, message):
-
-    au = utils.speech(audio=message["data"])
-    print(au)
-    sio.emit("sig", {"data": au}, room=sid)
+    msg = threading.Thread(target=s.run, args=[message["data"], sio,sid]).start()
 
 
 @sio.event
 def disconnect(sid):
     print("didsc")
     sio.disconnect(sid)
-
 
 
 @sio.event
