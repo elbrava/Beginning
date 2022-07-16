@@ -97,7 +97,7 @@ def ii(request):
     return render(request,"ii.html")
 
 def scav(request):
-    return render(request, "scav.html", {"cond": "scav"})
+    return render(request, "index.html", {"cond": "scav"})
 
 
 def operate(request):
